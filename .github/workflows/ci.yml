@@ -16,7 +16,7 @@ jobs:
     name: Build
     runs-on: ubuntu-20.04
     env:
-      DOCKER_IMAGE: docker.io/waltmoorhouse/zephyr-build
+      DOCKER_IMAGE: waltmoorhouse/zephyr-build
 
     steps:
     - name: Setup Docker
