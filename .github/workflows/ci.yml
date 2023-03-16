@@ -29,9 +29,9 @@ jobs:
       if: ${{ github.event_name == 'pull_request' }}
       run: docker build -t ${{ env.DOCKER_IMAGE }} .
 
-    - id: latest-tag
-      if: ${{ github.event_name != 'pull_request' }}
-      uses: KrogerWalt/action-get-latest-tag@v3
+    - name: Get current tag
+      id: get-current-tag
+      uses: zingimmick/github-action-get-current-tag@v1
 
     - name: Login to DockerHub
       if: ${{ github.event_name != 'pull_request' }}
@@ -44,7 +44,7 @@ jobs:
     - name: Push Developer docker image
       if: ${{ github.event_name != 'pull_request' }}
       run: |
-        docker build -t ${{ env.DOCKER_IMAGE }}:${{ steps.latest-tag.outputs.tag }} .
-        docker tag ${{ env.DOCKER_IMAGE }}:${{ steps.latest-tag.outputs.tag }} ${{ env.DOCKER_IMAGE }}:latest
-        docker push ${{ env.DOCKER_IMAGE }}:${{ steps.latest-tag.outputs.tag }}
+        docker build -t ${{ env.DOCKER_IMAGE }}:${{ steps.get-current-tag.outputs.tag }} .
+        docker tag ${{ env.DOCKER_IMAGE }}:${{ steps.get-current-tag.outputs.tag }} ${{ env.DOCKER_IMAGE }}:latest
+        docker push ${{ env.DOCKER_IMAGE }}:${{ steps.get-current-tag.outputs.tag }}
         docker push ${{ env.DOCKER_IMAGE }}:latest
