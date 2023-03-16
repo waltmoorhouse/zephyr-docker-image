@@ -19,8 +19,8 @@ SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Set up ZDK ENVs
-ENV ZSDK_HOME /home/user/ncs
-ENV ZSDK_VERSION $ZSDK_VERSION
+ENV ZSDK_HOME=/home/user/ncs
+ENV ZSDK_VERSION=${ZSDK_VERSION}
 
 # Install base packages
 RUN apt-get -y update && \
@@ -175,7 +175,7 @@ RUN wget ${WGET_ARGS} https://static.rust-lang.org/rustup/rustup-init.sh && \
 # Install LLVM and Clang
 RUN wget ${WGET_ARGS} -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
 	apt-get update && \
-	apt-get install -y clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION llvm-$LLVM_VERSION-dev
+	apt-get install -y clang-${LLVM_VERSION} lldb-${LLVM_VERSION} lld-${LLVM_VERSION} clangd-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev
 
 # Install Zephyr SDK
 RUN mkdir -p /opt/toolchains && \
@@ -223,8 +223,10 @@ RUN mkdir ${HOME}/ncs && \
     west update && \
     west zephyr-export && \
     pip3 install --user -r zephyr/scripts/requirements.txt && \
-    pip3 install --user -r nrf/scripts/requirements.txt && \
-    pip3 install --user -r bootloader/mcuboot/scripts/requirements.txt
+    pip3 install --user -r nrf/scripts/requirements-base.txt && \
+    pip3 install --user -r nrf/scripts/requirements-build.txt && \
+    pip3 install --user -r bootloader/mcuboot/scripts/requirements.txt && \
+    pip3 install --user PyYAML pykwalify
 
 RUN sudo -E -- bash -c ' \
 	/opt/toolchains/zephyr-sdk-${ZSDK_VERSION}/setup.sh -c && \
