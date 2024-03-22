@@ -35,8 +35,9 @@ RUN apt-get -y update && \
 		ca-certificates \
 		ccache \
 		chrpath \
+		cmake \
 		cpio \
-    curl \
+        curl \
 		device-tree-compiler \
 		dfu-util \
 		diffstat \
@@ -48,6 +49,7 @@ RUN apt-get -y update && \
 		gawk \
 		gcc \
 		gcovr \
+		gdb \
 		git \
 		git-core \
 		gnupg \
@@ -56,7 +58,8 @@ RUN apt-get -y update && \
 		help2man \
 		iproute2 \
 		lcov \
-    libcurl4-openssl-dev \
+		libcairo2-dev \
+        libcurl4-openssl-dev \
 		libglib2.0-dev \
 		libgtk2.0-0 \
 		liblocale-gettext-perl \
@@ -73,6 +76,7 @@ RUN apt-get -y update && \
 		net-tools \
 		ninja-build \
 		openssh-client \
+		parallel \
 		pkg-config \
 		protobuf-compiler \
 		python3-dev \
@@ -116,18 +120,18 @@ ENV LC_ALL=en_US.UTF-8
 
 # Install Doxygen (x86 only)
 # NOTE: Pre-built Doxygen binaries are only available for x86_64 host.
-RUN if [ "${HOSTTYPE}" = "x86_64" ]; then \
-	wget ${WGET_ARGS} https://downloads.sourceforge.net/project/doxygen/rel-${DOXYGEN_VERSION}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz && \
-	tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt && \
-	ln -s /opt/doxygen-${DOXYGEN_VERSION}/bin/doxygen /usr/local/bin && \
-	rm doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz \
-	; fi
+#RUN if [ "${HOSTTYPE}" = "x86_64" ]; then \
+#	wget ${WGET_ARGS} https://downloads.sourceforge.net/project/doxygen/rel-${DOXYGEN_VERSION}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz && \
+#	tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz -C /opt && \
+#	ln -s /opt/doxygen-${DOXYGEN_VERSION}/bin/doxygen /usr/local/bin && \
+#	rm doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz \
+#	; fi
 
 # Install CMake
-RUN wget ${WGET_ARGS} https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh && \
-	chmod +x cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh && \
-	./cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh --skip-license --prefix=/usr/local && \
-	rm -f ./cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh
+#RUN wget ${WGET_ARGS} https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh && \
+#	chmod +x cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh && \
+#	./cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh --skip-license --prefix=/usr/local && \
+#	rm -f ./cmake-${CMAKE_VERSION}-Linux-${HOSTTYPE}.sh
 
 # Install renode (x86 only)
 # NOTE: Renode is currently only available for x86_64 host.
@@ -141,16 +145,17 @@ RUN if [ "${HOSTTYPE}" = "x86_64" ]; then \
 	; fi
 
 # Install Python dependencies
-RUN pip3 install wheel pip -U &&\
-	pip3 install -r https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/master/scripts/requirements.txt && \
-	pip3 install -r https://raw.githubusercontent.com/zephyrproject-rtos/mcuboot/master/scripts/requirements.txt && \
-	pip3 install west &&\
-	pip3 install sh &&\
-	pip3 install awscli PyGithub junitparser pylint \
-		     statistics numpy \
-		     imgtool \
-		     protobuf \
-		     GitPython
+RUN python3 -m pip install -U --no-cache-dir pip && \
+	pip3 install -U --no-cache-dir wheel setuptools && \
+	pip3 install --no-cache-dir pygobject && \
+	pip3 install --no-cache-dir \
+		-r https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/main/scripts/requirements.txt \
+		-r https://raw.githubusercontent.com/zephyrproject-rtos/mcuboot/main/scripts/requirements.txt \
+		GitPython imgtool junitparser numpy protobuf PyGithub \
+		pylint sh statistics west \
+		nrf-regtool>=5.1.0 && \
+	pip3 check
+
 
 # Install BSIM
 RUN mkdir -p /opt/bsim && \
@@ -164,26 +169,43 @@ RUN mkdir -p /opt/bsim && \
 	echo ${BSIM_VERSION} > ./version && \
 	chmod ag+w . -R
 
+# Install cargo environment
+RUN wget -q -O-  "https://sh.rustup.rs" | sh -s -- -y
+
 # Install uefi-run utility
-RUN wget ${WGET_ARGS} https://static.rust-lang.org/rustup/rustup-init.sh && \
-	chmod +x rustup-init.sh && \
-	./rustup-init.sh -y && \
-	. $HOME/.cargo/env && \
-	cargo install uefi-run --root /usr && \
-	rm -f ./rustup-init.sh
+RUN ~/.cargo/bin/cargo install uefi-run --root /usr
 
 # Install LLVM and Clang
-RUN wget ${WGET_ARGS} -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-	apt-get update && \
-	apt-get install -y clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION llvm-$LLVM_VERSION-dev
+RUN wget ${WGET_ARGS} https://apt.llvm.org/llvm.sh && \
+	chmod +x llvm.sh && \
+	./llvm.sh ${LLVM_VERSION} all && \
+	rm -f llvm.sh
+
+# Install sparse package for static analysis
+RUN mkdir -p /opt/sparse && \
+	cd /opt/sparse && \
+	git clone https://git.kernel.org/pub/scm/devel/sparse/sparse.git && \
+	cd sparse && git checkout ${SPARSE_VERSION} && \
+	make -j8 && \
+	PREFIX=/opt/sparse make install && \
+	rm -rf /opt/sparse/sparse
+
+# Install protobuf-compiler
+#RUN mkdir -p /opt/protoc && \
+#	cd /opt/protoc && \
+#	PROTOC_HOSTTYPE=$(case $HOSTTYPE in x86_64) echo "x86_64";; aarch64) echo "aarch_64";; esac) && \
+#	wget ${WGET_ARGS} https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-${PROTOC_HOSTTYPE}.zip && \
+#	unzip protoc-${PROTOC_VERSION}-linux-${PROTOC_HOSTTYPE}.zip && \
+#	ln -s /opt/protoc/bin/protoc /usr/local/bin && \
+#	rm -f protoc-${PROTOC_VERSION}-linux-${PROTOC_HOSTTYPE}.zip
 
 # Install Zephyr SDK
 RUN mkdir -p /opt/toolchains && \
-	cd /opt/toolchains && \
-	wget ${WGET_ARGS} https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZSDK_VERSION}/zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.gz && \
-	tar xf zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.gz && \
-	zephyr-sdk-${ZSDK_VERSION}/setup.sh -t all -h -c && \
-	rm zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.gz
+    cd /opt/toolchains && \
+    wget ${WGET_ARGS} https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZSDK_VERSION}/zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.xz && \
+    tar xf zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.xz && \
+    zephyr-sdk-${ZSDK_VERSION}/setup.sh -t all -h -c && \
+    rm zephyr-sdk-${ZSDK_VERSION}_linux-${HOSTTYPE}.tar.xz
 
 # Clean up stale packages
 RUN apt-get clean -y && \
